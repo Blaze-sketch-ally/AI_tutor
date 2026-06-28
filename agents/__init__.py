@@ -16,6 +16,9 @@ from .diagram_agent import DiagramAgent
 from .topic_extractor import TopicExtractor
 from .knowledge_router import KnowledgeRouter
 from .query_resolver import QueryResolverAgent
+from .comparison_agent import ComparisonAgent
+from .cross_pdf_notes_agent import CrossPDFNotesAgent
+from .cross_pdf_quiz_agent import CrossPDFQuizAgent
 
 __all__ = [
     "Orchestrator",
@@ -32,6 +35,9 @@ __all__ = [
     "DiagramAgent",
     "KnowledgeRouter",
 
-    "TopicExtractor"
-    "QueryResolverAgent"
+    "TopicExtractor",
+    "QueryResolverAgent",
+    "ComparisonAgent",
+    "CrossPDFNotesAgent",
+    "CrossPDFQuizAgent"
 ]

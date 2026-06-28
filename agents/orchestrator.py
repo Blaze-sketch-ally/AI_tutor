@@ -10,8 +10,12 @@ from agents.diagram_agent import DiagramAgent
 from agents.intent_classifier import IntentClassifier
 from agents.topic_extractor import TopicExtractor
 from agents.query_resolver import QueryResolverAgent
+from agents.comparison_agent import ComparisonAgent
+from agents.cross_pdf_notes_agent import CrossPDFNotesAgent
+from agents.cross_pdf_quiz_agent import CrossPDFQuizAgent
 
 from memory.chat_memory import ChatMemory
+from memory.session_manager import SessionManager
 from memory.conversation_summary import (
     ConversationSummaryAgent
 )
@@ -23,17 +27,23 @@ class Orchestrator:
 
     def __init__(
         self,
+        username:str,
         session_id: str
     ):
 
         self.session_id = session_id
+        self.username=username
 
         self.retriever = Retriever(
             session_id=session_id
         )
 
         self.memory = ChatMemory(
+            username=username,
             session_id=session_id
+        )
+        self.session_manager = SessionManager(
+            username=username
         )
 
         self.chat = ChatAgent()
@@ -61,6 +71,14 @@ class Orchestrator:
         self.query_resolver = (
             QueryResolverAgent()
         )
+        self.comparison = ComparisonAgent()
+        self.cross_notes = (
+                        CrossPDFNotesAgent()
+        )
+
+        self.cross_quiz = (
+                        CrossPDFQuizAgent()
+        )   
 
     @traceable(
         name="Orchestrator.run_full_pipeline"
@@ -68,7 +86,8 @@ class Orchestrator:
     def run(
         self,
         query: str,
-        marks: str = "8"
+        marks: str = "8",
+        selected_pdfs:list[str]|None=None
     ):
 
         # =====================================
@@ -117,6 +136,18 @@ class Orchestrator:
             "user",
             query
         )
+        if not self.session_manager.session_exists(
+            self.session_id
+        ):
+            self.session_manager.create_session(
+                title="New Chat"
+            )
+        if self.memory.size() == 1:
+
+            self.session_manager.update_title(
+                self.session_id,
+                query[:50]
+            )
 
         history_text = (
             self.memory.get_history_text()
@@ -131,6 +162,9 @@ class Orchestrator:
                 resolved_query
             )
         )
+        print("\n========== INTENTS ==========")
+        print(intents)
+        print("=============================\n")
 
         knowledge_source = intents.get(
             "knowledge_source",
@@ -138,32 +172,95 @@ class Orchestrator:
         )
 
         # =====================================
-        # PDF RETRIEVAL
+        # PDF RETRIEVAL + SOURCES
         # =====================================
 
         pdf_context = ""
+        pdf_contexts={}
+        sources = []
         strict_pdf = False
 
         try:
 
             if (
-                knowledge_source in [
-                    "pdf",
-                    "hybrid"
-                ]
+                (
+                    knowledge_source in [
+                        "pdf",
+                        "hybrid"
+                    ]
+                    or intents.get(
+                        "comparison",
+                        False
+                    )
+                )
                 and self.retriever.has_documents()
             ):
 
-                pdf_context = (
-                    self.retriever.get_context(
-                        resolved_query
+    # =====================================
+    # CROSS PDF RETRIEVAL
+    # =====================================
+
+                if (
+                    intents.get("all_pdfs", False)
+                    or intents.get("comparison", False)
+                ):
+
+                    grouped_result = (
+                        self.retriever.get_grouped_context_by_source(
+                            resolved_query,
+                            selected_pdfs=selected_pdfs,
+                            top_k=5
+                        )
                     )
-                )
 
-                if knowledge_source == "pdf":
+                    pdf_contexts = (
+                        grouped_result.get(
+                            "pdf_contexts",
+                            {}
+                        )
+                    )
+                    print("\n===== PDF CONTEXTS =====")
+                    print(pdf_contexts.keys())
+                    print("========================\n")
 
-                    strict_pdf = True
+                    sources = (
+                        grouped_result.get(
+                            "sources",
+                            []
+                        )
+                    )
 
+    # =====================================
+    # NORMAL RETRIEVAL
+    # =====================================
+
+                else:
+
+                    retrieval_result = (
+                        self.retriever.get_context_with_sources(
+                            query=resolved_query,
+                            selected_pdfs=selected_pdfs,
+                            top_k=5
+                        )
+                    )
+
+                    pdf_context = (
+                        retrieval_result.get(
+                            "context",
+                            ""
+                        )
+                    )
+
+                    sources = (
+                        retrieval_result.get(
+                            "sources",
+                            []
+                        )
+                    )
+
+            if knowledge_source == "pdf":
+
+                strict_pdf = True
         except Exception as e:
 
             print(
@@ -171,11 +268,14 @@ class Orchestrator:
             )
 
             pdf_context = ""
+            pdf_contexts={}
+            sources = []
 
         has_pdf = bool(
             pdf_context.strip()
-        )
-
+        ) or bool(
+            pdf_contexts
+    )
         # =====================================
         # DEBUG
         # =====================================
@@ -222,10 +322,19 @@ class Orchestrator:
             "Knowledge Source:",
             knowledge_source
         )
+        print(
+                "Selected PDFs:",
+                selected_pdfs
+            )
 
         print(
             "PDF Context Found:",
             has_pdf
+        )
+
+        print(
+            "Sources Found:",
+            len(sources)
         )
 
         print(
@@ -255,6 +364,10 @@ class Orchestrator:
 
             and not intents.get(
                 "quiz",
+                False
+            )
+            and not intents.get(
+                "comparison",
                 False
             )
 
@@ -291,13 +404,24 @@ class Orchestrator:
             )
 
             self.memory.add_message(
-                "assistant",
-                reply
+                message={
+                    "role": "assistant",
+                    "content": memory_text,
+                    "answer": response.get("answer"),
+                    "notes": response.get("notes"),
+                    "quiz": response.get("quiz"),
+                    "comparison": response.get("comparison"),
+                    "diagram": response.get("diagram"),
+                    "videos": response.get("videos", []),
+                    "papers": response.get("papers", []),
+                    "sources": response.get("sources", [])
+                }
             )
 
             return {
                 "mode": "chat",
-                "chat": reply
+                "chat": reply,
+                "sources": []
             }
 
         # =====================================
@@ -305,7 +429,8 @@ class Orchestrator:
         # =====================================
 
         response = {
-            "mode": "mixed"
+            "mode": "mixed",
+            "sources": sources
         }
 
         # =====================================
@@ -335,15 +460,48 @@ class Orchestrator:
         if intents.get(
             "notes",
             False
+    ):
+
+            if intents.get(
+                "all_pdfs",
+                False
+            ):
+
+                print("Cross PDF Notes PDFs:")
+                print(pdf_contexts.keys())
+                response["notes"] = (
+                    self.cross_notes.generate_notes(
+                        topic=query,
+                        pdf_contexts=pdf_contexts
+                    )
+                )
+
+            else:
+
+                response["notes"] = (
+                    self.notes.generate_notes(
+                        topic=query,
+                        context=pdf_context,
+                        history_text=history_text,
+                        summary=conversation_summary,
+                        strict_pdf=strict_pdf
+                    )
+                )
+        # =====================================
+# COMPARISON
+# =====================================
+
+        if intents.get(
+            "comparison",
+            False
         ):
 
-            response["notes"] = (
-                self.notes.generate_notes(
+            response["comparison"] = (
+                self.comparison.generate_comparison(
                     topic=query,
-                    context=pdf_context,
+                    pdf_contexts=pdf_contexts,
                     history_text=history_text,
-                    summary=conversation_summary,
-                    strict_pdf=strict_pdf
+                    summary=conversation_summary
                 )
             )
 
@@ -352,19 +510,35 @@ class Orchestrator:
         # =====================================
 
         if intents.get(
-            "quiz",
-            False
-        ):
+    "quiz",
+    False
+):
 
-            response["quiz"] = (
-                self.quiz.generate_quiz(
-                    topic=query,
-                    context=pdf_context,
-                    history_text=history_text,
-                    summary=conversation_summary,
-                    strict_pdf=strict_pdf
+            if intents.get(
+                "all_pdfs",
+                False
+            ):
+
+                print("Cross PDF Quiz PDFs:")
+                print(pdf_contexts.keys())
+                response["quiz"] = (
+                    self.cross_quiz.generate_quiz(
+                        topic=query,
+                        pdf_contexts=pdf_contexts
+                    )
                 )
-            )
+
+            else:
+
+                response["quiz"] = (
+                    self.quiz.generate_quiz(
+                        topic=query,
+                        context=pdf_context,
+                        history_text=history_text,
+                        summary=conversation_summary,
+                        strict_pdf=strict_pdf
+                    )
+                )
 
         # =====================================
         # DIAGRAM
@@ -425,7 +599,18 @@ class Orchestrator:
         # FALLBACK ANSWER
         # =====================================
 
-        if len(response) == 1:
+        if not any(
+                key in response
+                for key in [
+                    "answer",
+                    "comparison",
+                    "notes",
+                    "quiz",
+                    "diagram",
+                    "videos",
+                    "papers"
+                ]
+            ):
 
             response["answer"] = (
                 self.tutor.generate_answer(
@@ -445,31 +630,19 @@ class Orchestrator:
         memory_text = ""
 
         if "answer" in response:
+            memory_text += response["answer"]
 
-            memory_text += (
-                response["answer"]
-            )
+        if "comparison" in response:
+            memory_text += "\n\n" + response["comparison"]
 
         if "notes" in response:
-
-            memory_text += (
-                "\n\n" +
-                response["notes"]
-            )
+            memory_text += "\n\n" + response["notes"]
 
         if "quiz" in response:
-
-            memory_text += (
-                "\n\n" +
-                response["quiz"]
-            )
+            memory_text += "\n\n" + response["quiz"]
 
         if "diagram" in response:
-
-            memory_text += (
-                "\n\n" +
-                response["diagram"]
-            )
+            memory_text += "\n\n" + response["diagram"]
 
         if memory_text.strip():
 
@@ -477,5 +650,10 @@ class Orchestrator:
                 "assistant",
                 memory_text
             )
+        self.session_manager.save_history(
+            self.session_id,
+            self.memory.history
+        )
 
         return response
+                

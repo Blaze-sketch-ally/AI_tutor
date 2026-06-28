@@ -150,16 +150,15 @@ class VectorStore:
     # ----------------------------------
 
     def search(
-        self,
-        query: str,
-        n_results: int = 4
-    ):
+    self,
+    query: str,
+    n_results: int = 4,
+    pdf_name: str | None = None
+):
 
         try:
 
-            count = (
-                self.collection.count()
-            )
+            count = self.collection.count()
 
             print(
                 f"Searching Collection: {self.collection_name}"
@@ -184,14 +183,38 @@ class VectorStore:
                 )
             )
 
-            results = self.collection.query(
-                query_embeddings=[
+            query_kwargs = {
+                "query_embeddings": [
                     query_embedding
                 ],
-                n_results=min(
+                "n_results": min(
                     n_results,
                     count
                 )
+            }
+
+            # -------------------------
+            # PDF FILTER
+            # -------------------------
+
+            if pdf_name:
+
+                query_kwargs["where"] = {
+                    "source": pdf_name
+                }
+            print("\n========== FILTER DEBUG ==========")
+            print("Requested PDF:", pdf_name)
+
+            docs = self.collection.get()
+
+            print("Stored sources:")
+
+            for meta in docs["metadatas"][:5]:
+                print(meta["source"])
+
+            print("=================================\n")
+            results = self.collection.query(
+                **query_kwargs
             )
 
             docs = results.get(
@@ -201,6 +224,11 @@ class VectorStore:
 
             dists = results.get(
                 "distances",
+                [[]]
+            )[0]
+
+            metas = results.get(
+                "metadatas",
                 [[]]
             )[0]
 
@@ -223,10 +251,7 @@ class VectorStore:
 
                 "distances": dists,
 
-                "metadatas": results.get(
-                    "metadatas",
-                    [[]]
-                )[0]
+                "metadatas": metas
             }
 
         except Exception as e:

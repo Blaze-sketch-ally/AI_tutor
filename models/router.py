@@ -23,10 +23,10 @@ def route(
             model=model
         )
 
-    elif provider == "hf":
+    elif provider == "groq":
 
         if model is None:
-            model = "google/gemma-2-9b-it"
+            model = "llama-3.3-70b-versatile"
 
         return hf_generate(
             prompt=prompt,

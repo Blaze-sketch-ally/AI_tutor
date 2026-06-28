@@ -1,0 +1,26 @@
+{
+    "session_id": "cc6a7f13-dd3c-4f9f-9737-22b8d803e275",
+    "title": "give notes from pdf",
+    "created_at": "2026-06-27 14:41:21.420647",
+    "summary": "",
+    "history": [
+        {
+            "role": "user",
+            "content": "give notes from pdf"
+        },
+        {
+            "role": "assistant",
+            "content": "\n\n# Topic Overview\nThe topic discusses adaptive modulation techniques, specifically QPSK and 16-QAM, in wireless communication systems. It highlights the working principle, performance, and impact of fading conditions on system performance.\n\n# Key Concepts\n- Adaptive modulation\n- QPSK (Quadrature Phase Shift Keying)\n- 16-QAM (16-Quadrature Amplitude Modulation)\n- Rician channel and K-factor\n- AWGN (Additive White Gaussian Noise) channel\n- SNR (Signal-to-Noise Ratio)\n- BER (Bit Error Rate)\n\n# Important Points\n- Adaptive modulation is used to maximize data throughput based on the SNR values.\n- QPSK is selected when 10 dB ≤ SNR < 18 dB for a balance between data rate and reliability.\n- 16-QAM is used at high SNR values to maximize data throughput.\n- The Rician channel is characterized by the K-factor, which represents the ratio of power in the Line-of-Sight component to the scattered components.\n- A higher K-factor results in lower BER across all distances, indicating a strong Line-of-Sight component.\n\n# Formulas (if applicable)\n- Transmitted QPSK signal: s(t) = √(2/Ts) [ I cos(2πf_c t) + Q sin(2πf_c t)] (11)\n- Alternative representation of QPSK: s(t) = √(Eb/Tb) [ I cos(2πf_c t) + Q sin(2πf_c t)] (9)\n- BER performance of QPSK in an AWGN channel: BER = Q(√(2Eb/N₀)) (10)\n\n# Quick Revision Notes\n- Adaptive modulation switches between QPSK and 16-QAM based on SNR.\n- QPSK represents 2 bits per symbol and is used in moderate channel conditions.\n- 16-QAM is a higher-order modulation technique that varies both amplitude and phase for higher data transmission rates.\n- The K-factor in the Rician channel affects system performance, with higher K-factors resulting in better performance."
+        }
+    ],
+    "pdfs": [
+        {
+            "name": "Adaptive Modulation 2D Channel (5).pdf",
+            "path": "data\\users\\arunangshupal\\sessions\\cc6a7f13-dd3c-4f9f-9737-22b8d803e275\\pdfs\\Adaptive Modulation 2D Channel (5).pdf",
+            "uploaded_at": "2026-06-27 14:41:37.793756"
+        }
+    ],
+    "selected_pdfs": [
+        "Adaptive Modulation 2D Channel (5).pdf"
+    ]
+}

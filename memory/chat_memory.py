@@ -1,33 +1,102 @@
-from typing import List, Dict
+from typing import List, Dict, Optional
+
+from memory.session_manager import SessionManager
 
 
 class ChatMemory:
 
     def __init__(
         self,
+        username: str,
         session_id: str
     ):
 
+        self.username = username
         self.session_id = session_id
 
-        self.history: List[Dict] = []
+        self.session_manager = SessionManager(
+            username=username
+        )
+
+        # ----------------------------------
+        # LOAD EXISTING HISTORY
+        # ----------------------------------
+
+        self.history: List[Dict] = (
+            self.session_manager.get_history(
+                session_id
+            )
+        )
 
     # ----------------------------------
-    # ADD MESSAGE
+    # SAVE MEMORY
+    # ----------------------------------
+
+    def save(self):
+
+        self.session_manager.save_history(
+            session_id=self.session_id,
+            history=self.history
+        )
+
+    # ----------------------------------
+    # LOAD MEMORY
+    # ----------------------------------
+
+    def load(self):
+
+        self.history = (
+            self.session_manager.get_history(
+                self.session_id
+            )
+        )
+
+    # ----------------------------------
+    # ADD MESSAGE (Backward Compatible)
     # ----------------------------------
 
     def add_message(
         self,
-        role: str,
-        content: str
+        role: Optional[str] = None,
+        content: Optional[str] = None,
+        message: Optional[Dict] = None
     ):
 
-        self.history.append(
-            {
-                "role": role,
-                "content": content
-            }
+        # New structured message
+        if message is not None:
+
+            self.history.append(message)
+
+        # Old style
+        else:
+
+            self.history.append(
+                {
+                    "role": role,
+                    "content": content
+                }
+            )
+
+        self.save()
+
+    # ----------------------------------
+    # UPDATE LAST MESSAGE
+    # ----------------------------------
+
+    def update_last_message(
+        self,
+        updates: Dict
+    ):
+
+        if not self.history:
+
+            return
+
+        self.history[-1].update(
+            updates
         )
+
+        self.save()
 
     # ----------------------------------
     # GET HISTORY
@@ -39,6 +108,14 @@ class ChatMemory:
     ):
 
         return self.history[-max_turns:]
+
+    # ----------------------------------
+    # GET FULL HISTORY
+    # ----------------------------------
+
+    def get_full_history(self):
+
+        return self.history
 
     # ----------------------------------
     # HISTORY AS TEXT
@@ -55,9 +132,19 @@ class ChatMemory:
 
         for msg in recent:
 
+            role = msg.get(
+                "role",
+                "assistant"
+            )
+
+            content = msg.get(
+                "content",
+                ""
+            )
+
             history_text += (
-                f"{msg['role'].upper()}: "
-                f"{msg['content']}\n"
+                f"{role.upper()}: "
+                f"{content}\n"
             )
 
         return history_text.strip()
@@ -68,13 +155,59 @@ class ChatMemory:
 
     def get_last_user_message(self):
 
-        for msg in reversed(self.history):
+        for msg in reversed(
+            self.history
+        ):
 
-            if msg["role"] == "user":
+            if msg.get(
+                "role"
+            ) == "user":
 
-                return msg["content"]
+                return msg.get(
+                    "content",
+                    ""
+                )
 
         return ""
+
+    # ----------------------------------
+    # LAST ASSISTANT MESSAGE
+    # ----------------------------------
+
+    def get_last_assistant_message(self):
+
+        for msg in reversed(
+            self.history
+        ):
+
+            if msg.get(
+                "role"
+            ) == "assistant":
+
+                return msg.get(
+                    "content",
+                    ""
+                )
+
+        return ""
+
+    # ----------------------------------
+    # LAST ASSISTANT OBJECT
+    # ----------------------------------
+
+    def get_last_assistant_message_object(self):
+
+        for msg in reversed(
+            self.history
+        ):
+
+            if msg.get(
+                "role"
+            ) == "assistant":
+
+                return msg
+
+        return {}
 
     # ----------------------------------
     # TOTAL MESSAGES
@@ -82,7 +215,9 @@ class ChatMemory:
 
     def size(self):
 
-        return len(self.history)
+        return len(
+            self.history
+        )
 
     # ----------------------------------
     # CLEAR MEMORY
@@ -90,4 +225,6 @@ class ChatMemory:
 
     def clear(self):
 
-        self.history.clear()
+        self.history = []
+
+        self.save()

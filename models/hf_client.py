@@ -10,7 +10,7 @@ client = InferenceClient(
 
 def generate(
     prompt: str,
-    model: str = "google/gemma-2-9b-it",
+    model: str = "Qwen/Qwen2.5-7B-Instruct",
     max_new_tokens: int = 512
 ):
     """

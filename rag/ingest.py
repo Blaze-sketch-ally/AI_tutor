@@ -85,7 +85,7 @@ class PDFIngestor:
 
             pdf_name = Path(
                 pdf_path
-            ).stem
+            ).name
 
             print(
                 f"Processing PDF: {pdf_name}"
